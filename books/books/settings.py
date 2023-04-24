@@ -77,16 +77,10 @@ WSGI_APPLICATION = 'books.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-
-   	'default': {
-       		'ENGINE': 'django.db.backends.postgresql_psycopg2',
-       		'NAME': 'books_db1',
-       		'USER': 'books_user',
-       		'PASSWORD': 'warlight123',
-      		'HOST': 'localhost',
-       		'PORT': '3300',
-   	}
-
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -147,7 +141,6 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
 }
 
-SOCIAL_AUTH_POSTGRES_JSONFIELD = True
 
 
 SOCIAL_AUTH_GITHUB_KEY = "47374c137d168320ba4a"

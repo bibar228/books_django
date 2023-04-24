@@ -21,3 +21,7 @@ class BookViewSet(ModelViewSet):
 
 def auth(request):
     return render(request, "oauth.html")
+
+def rega(request):
+    data = {"name" : request.user.username}
+    return render(request, "acc_profile.html", data)
