@@ -22,6 +22,13 @@ class BooksApiTestCase(APITestCase):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(BooksSerializer([self.book_1, self.book_2, self.book_3], many=True).data, response.data)
 
+    def test_get_solo_object(self):
+        url = reverse("book-detail", args=(self.book_1.id,))
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual(BooksSerializer(self.book_1, many=False).data, response.data)
+
+
     def test_get_filter(self):
         url = reverse("book-list")
         response = self.client.get(url, data={"price": 55})
@@ -59,7 +66,6 @@ class BooksApiTestCase(APITestCase):
 
 
     def test_update(self):
-
         url = reverse("book-detail", args=(self.book_1.id,))
         data = {
             "name": self.book_1.name,
@@ -74,17 +80,10 @@ class BooksApiTestCase(APITestCase):
         self.assertEqual(575, self.book_1.price)
 
     def test_delete(self):
-
         url = reverse("book-detail", args=(self.book_1.id,))
-        data = {
-            "name": self.book_1.name,
-            "price": 575,
-            "author_name": self.book_1.author_name
-        }
-        json_data = json.dumps(data)
         self.client.force_login(self.user)
-        response = self.client.delete(url, data=json_data, content_type="application/json")
+        response = self.client.delete(url)
         self.assertEqual(status.HTTP_204_NO_CONTENT, response.status_code)
-        self.book_1.refresh_from_db()
-        self.assertEqual(575, self.book_1.price)
+        self.assertEqual(Book.objects.count(), 2)
+
 
