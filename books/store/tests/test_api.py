@@ -119,3 +119,18 @@ class BooksApiTestCase(APITestCase):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.book_1.refresh_from_db()
         self.assertEqual(575, self.book_1.price)
+    def test_delete_not_owner(self):
+        self.user2 = User.objects.create(username="test_username2")
+        url = reverse("book-detail", args=(self.book_1.id,))
+        self.client.force_login(self.user2)
+        response = self.client.delete(url)
+        self.assertEqual(status.HTTP_403_FORBIDDEN, response.status_code)
+        self.assertEqual({'detail': ErrorDetail(string='You do not have permission to perform this action.', code='permission_denied')}, response.data)
+        self.assertEqual(Book.objects.count(), 3)
+    def test_delete_not_owner_but_staff(self):
+        self.user2 = User.objects.create(username="test_username2", is_staff=True)
+        url = reverse("book-detail", args=(self.book_1.id,))
+        self.client.force_login(self.user2)
+        response = self.client.delete(url)
+        self.assertEqual(status.HTTP_204_NO_CONTENT, response.status_code)
+        self.assertEqual(Book.objects.count(), 2)
