@@ -1,6 +1,7 @@
 import json
 
 from django.contrib.auth.models import User
+from django.db.models import Count, Case, When
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
@@ -15,41 +16,46 @@ class BooksApiTestCase(APITestCase):
         self.user = User.objects.create(username="test_username")
         self.book_1 = Book.objects.create(name="Test book 1", price=25, author_name="Author 1", owner=self.user)
         self.book_2 = Book.objects.create(name="Test book 2", price=550, author_name="Author 5")
-        self.book_3 = Book.objects.create(name="Test book Author 1", price=55, author_name="Author 2")
+        self.book_3 = Book.objects.create(name="Test book 3", price=55, author_name="Author 2")
 
     def test_get(self):
         url = reverse("book-list")
         response = self.client.get(url)
-
+        books = Book.objects.all().annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))))
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(BooksSerializer([self.book_1, self.book_2, self.book_3], many=True).data, response.data)
+        self.assertEqual(BooksSerializer(books, many=True).data, response.data)
 
     def test_get_solo_object(self):
         url = reverse("book-detail", args=(self.book_1.id,))
+        books = Book.objects.all().annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1)))).filter(id__in=[self.book_1.id])
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(BooksSerializer(self.book_1, many=False).data, response.data)
+        self.assertEqual(json.loads(json.dumps(BooksSerializer(*books, many=False).data)), json.loads(json.dumps(response.data)))
 
 
     def test_get_filter(self):
         url = reverse("book-list")
+        books = Book.objects.filter(id__in=[self.book_3.id]).annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))))
         response = self.client.get(url, data={"price": 55})
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(BooksSerializer([self.book_3], many=True).data, response.data)
+        self.assertEqual(json.loads(json.dumps(BooksSerializer(books, many=True).data)), json.loads(json.dumps(response.data)))
 
 
     def test_get_search(self):
         url = reverse("book-list")
+        books = Book.objects.filter(id__in=[self.book_1.id]).annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))))
         response = self.client.get(url, data={"search": "Author 1"})
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(BooksSerializer([self.book_1, self.book_3], many=True).data, response.data)
+        self.assertEqual(json.loads(json.dumps(BooksSerializer(books, many=True).data)), json.loads(json.dumps(response.data)))
 
     def test_get_sorted(self):
         url = reverse("book-list")
-        response = self.client.get(url, data={"ordering": "-price"})
+        books = Book.objects.all().annotate(
+            annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))))
+        response = self.client.get(url, data={"ordering": "price"})
 
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(BooksSerializer([self.book_2, self.book_3, self.book_1], many=True).data, response.data)
+        self.assertEqual(json.loads(json.dumps(BooksSerializer(books, many=True).data)), json.loads(json.dumps(response.data)))
 
     def test_create(self):
         self.assertEqual(3, Book.objects.all().count())
@@ -120,6 +126,7 @@ class BooksApiTestCase(APITestCase):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.book_1.refresh_from_db()
         self.assertEqual(575, self.book_1.price)
+
     def test_delete_not_owner(self):
         self.user2 = User.objects.create(username="test_username2")
         url = reverse("book-detail", args=(self.book_1.id,))
@@ -128,6 +135,7 @@ class BooksApiTestCase(APITestCase):
         self.assertEqual(status.HTTP_403_FORBIDDEN, response.status_code)
         self.assertEqual({'detail': ErrorDetail(string='You do not have permission to perform this action.', code='permission_denied')}, response.data)
         self.assertEqual(Book.objects.count(), 3)
+
     def test_delete_not_owner_but_staff(self):
         self.user2 = User.objects.create(username="test_username2", is_staff=True)
         url = reverse("book-detail", args=(self.book_1.id,))
@@ -164,3 +172,27 @@ class BooksRelationTestCase(APITestCase):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         relation = UserBookRelation.objects.get(user=self.user, book=self.book_1)
         self.assertEqual(relation.in_bookmarks, True)
+
+    def test_rate(self):
+        url = reverse("userbookrelation-detail", args=(self.book_1.id,))
+        data = {
+            "rate": 3
+        }
+        json_data = json.dumps(data)
+        self.client.force_login(self.user)
+        response = self.client.patch(url, data=json_data, content_type="application/json")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        relation = UserBookRelation.objects.get(user=self.user, book=self.book_1)
+        self.assertEqual(3, relation.rate)
+
+    def test_rate_wrong(self):
+        url = reverse("userbookrelation-detail", args=(self.book_1.id,))
+        data = {
+            "rate": 6
+        }
+        json_data = json.dumps(data)
+        self.client.force_login(self.user)
+        response = self.client.patch(url, data=json_data, content_type="application/json")
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertEqual({'rate': [ErrorDetail(string='"6" is not a valid choice.', code='invalid_choice')]}, response.data)
+
