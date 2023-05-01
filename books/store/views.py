@@ -12,7 +12,7 @@ from store.serializers import BooksSerializer, UserBookRelationSerializer
 
 
 class BookViewSet(ModelViewSet):
-    queryset = Book.objects.all().annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))), rating=Avg("userbookrelation__rate"), discount_value=F("price")-(F("price")/100)*F("discount")).order_by("id")
+    queryset = Book.objects.all().annotate(annotated_likes=Count(Case(When(userbookrelation__like=True, then=1))), discount_value=F("price")-(F("price")/100)*F("discount")).select_related("owner").prefetch_related("readers").order_by("id")
     serializer_class = BooksSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     permission_classes = [IsOwnerdOrStaffOrReadOnly]

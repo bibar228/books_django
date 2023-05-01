@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+
+
 # Create your models here.
 class Book(models.Model):
     name = models.CharField(max_length=255)
@@ -8,7 +10,8 @@ class Book(models.Model):
     author_name = models.CharField(max_length=255)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="my_books")
     readers = models.ManyToManyField(User, through="UserBookRelation", related_name="books")
-    discount = models.IntegerField(max_length=2)
+    discount = models.IntegerField(default=0)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=None, null=True)
 
     def __str__(self):
         return f"Id {self.id}: {self.name}"
@@ -29,6 +32,17 @@ class UserBookRelation(models.Model):
     rate = models.PositiveSmallIntegerField(choices=RATE_CHOICES, null=True)
 
 
-
     def __str__(self):
-        return f"{self.user.username}: {self.book.name}, {self.rate}"
+        return f"{self.user.username}: {self.book.name}, RATE{self.rate}"
+
+    def save(self, *args, **kwargs):
+        from store.logic import set_rating
+
+        creating = not self.pk
+        old_rating = self.rate
+
+        super().save(*args, **kwargs)
+
+        new_rating = self.rate
+        if old_rating != new_rating or creating:
+            set_rating(self.book)
